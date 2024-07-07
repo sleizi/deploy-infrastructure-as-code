@@ -41,11 +41,6 @@ This project deploys an Instagram clone called Udagram to AWS using CloudFormati
 
 2. Wait for the stacks to be deleted. The `delete.sh` script will delete the Udagram stack first and then delete the network stack.
 
-### Notes
-
-- Ensure that the S3 bucket is empty before deleting the Udagram stack.
-- Update the `ami-0d5d9d301c853a04a` value in the `udagram.yml` template with the latest Ubuntu 22 AMI ID for your region.
-
 ## Outputs
 
 - `LoadBalancerDNSName`: The DNS name of the application load balancer.
