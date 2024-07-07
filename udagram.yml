@@ -84,7 +84,7 @@ Resources:
             apt-get install apache2 -y
             systemctl start apache2.service
             cd /var/www/html
-            echo "Application Web Server Up and Running!" > index.html
+            echo "it works! Udagram, Udacity" > index.html
         ImageId: ami-053b0d53c279acc90
         SecurityGroupIds:
           - !Ref UdagramServerSecGroup

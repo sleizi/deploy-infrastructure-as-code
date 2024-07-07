@@ -1,3 +1,4 @@
+http://udagra-myloa-1mebbedview1-851182647.us-east-1.elb.amazonaws.com/
 
 # Spin Up Resources
 - ./runscript.sh deploy network network.yml network-parameters.json us-east-1
