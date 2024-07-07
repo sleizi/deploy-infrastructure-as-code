@@ -1,100 +1,146 @@
 
-
 Parameters:
-  VpcCIDR:
+  
+  NetTeamInfra:
     Type: String
-    Default: 10.0.0.0/16
+    Description: Project name used for tagging resources
+
+  myVpcCIDR: 
+    Description: IP range for the VPC in CIDR notation
+    Type: String
+
   PublicSubnet1CIDR:
+    Description: IP range in CIDR notation for the public subnet in the first Availability Zone
     Type: String
-    Default: 10.0.1.0/24
+
   PublicSubnet2CIDR:
+    Description: IP range in CIDR notation for the public subnet in the second Availability Zone
     Type: String
-    Default: 10.0.2.0/24
+
   PrivateSubnet1CIDR:
+    Description: IP range in CIDR notation for the private subnet in the first Availability Zone
     Type: String
-    Default: 10.0.3.0/24
+    
   PrivateSubnet2CIDR:
+    Description: IP range in CIDR notation for the private subnet in the second Availability Zone
     Type: String
-    Default: 10.0.4.0/24
 
 Resources:
-  VPC:
+
+  VPC: 
     Type: AWS::EC2::VPC
     Properties:
-      CidrBlock: !Ref VpcCIDR
-      EnableDnsSupport: true
+      CidrBlock: !Ref myVpcCIDR
       EnableDnsHostnames: true
-      Tags:
-        - Key: Name
-          Value: UdagramVPC
+      Tags: 
+      - Key: Name 
+        Value: !Sub ${NetTeamInfra}-VPC            
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
-        - Key: Name
-          Value: UdagramInternetGateway
+      - Key: Name
+        Value: !Ref NetTeamInfra
 
-  AttachGateway:
+  InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
-      VpcId: !Ref VPC
       InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
 
-  PublicSubnet1:
+  PublicSubnet1: 
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
       CidrBlock: !Ref PublicSubnet1CIDR
       MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [0, !GetAZs]
-      Tags:
-        - Key: Name
-          Value: PublicSubnet1
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-public-1
 
-  PublicSubnet2:
+  PublicSubnet2: 
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
       CidrBlock: !Ref PublicSubnet2CIDR
       MapPublicIpOnLaunch: true
-      AvailabilityZone: !Select [1, !GetAZs]
-      Tags:
-        - Key: Name
-          Value: PublicSubnet2
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-public-2
 
-  PrivateSubnet1:
+  PrivateSubnet1: 
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
       CidrBlock: !Ref PrivateSubnet1CIDR
-      AvailabilityZone: !Select [0, !GetAZs]
-      Tags:
-        - Key: Name
-          Value: PrivateSubnet1
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-private-1
 
-  PrivateSubnet2:
+  PrivateSubnet2: 
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
       CidrBlock: !Ref PrivateSubnet2CIDR
-      AvailabilityZone: !Select [1, !GetAZs]
-      Tags:
-        - Key: Name
-          Value: PrivateSubnet2
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-private-2
+
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      Domain: vpc
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-nat-gateway-1
+
+  NatGateway2EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-nat-gateway-2
+  
+  NatGateway1: 
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-nat-gateway-1
+
+  NatGateway2: 
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway2EIP.AllocationId
+      SubnetId: !Ref PublicSubnet2
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-nat-gateway-2
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
-    Properties:
+    Properties: 
       VpcId: !Ref VPC
-      Tags:
-        - Key: Name
-          Value: PublicRouteTable
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-public
 
-  PublicRoute:
+  DefaultPublicRoute: 
     Type: AWS::EC2::Route
-    DependsOn: AttachGateway
-    Properties:
+    DependsOn: InternetGatewayAttachment
+    Properties: 
       RouteTableId: !Ref PublicRouteTable
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
@@ -102,42 +148,99 @@ Resources:
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet1
       RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
 
   PublicSubnet2RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref PublicSubnet2
       RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
 
-Outputs:
-  VPCId:
-    Description: VPC ID
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-private-1
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${NetTeamInfra}-private-2
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+Outputs: 
+
+  VPC: 
+    Description: A reference to the created VPC
     Value: !Ref VPC
     Export:
-      Name: VPCId
+      Name: !Sub ${NetTeamInfra}-vpc-id
 
-  PublicSubnet1Id:
-    Description: Public Subnet 1 ID
+  PublicSubnets:
+    Description: A list of the public subnets
+    Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+    Export:
+      Name: !Sub ${NetTeamInfra}-public-subnets
+
+  PrivateSubnets:
+    Description: A list of the private subnets
+    Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+    Export:
+      Name: !Sub ${NetTeamInfra}-private-subnets
+
+  PublicSubnet1:
+    Description: A reference to the public subnet in the 1st Availability Zone
     Value: !Ref PublicSubnet1
     Export:
-      Name: PublicSubnet1Id
+      Name: !Sub ${NetTeamInfra}-public-subnet1
 
-  PublicSubnet2Id:
-    Description: Public Subnet 2 ID
+  PublicSubnet2: 
+    Description: A reference to the public subnet in the 2nd Availability Zone
     Value: !Ref PublicSubnet2
     Export:
-      Name: PublicSubnet2Id
+      Name: !Sub ${NetTeamInfra}-public-subnet2
 
-  PrivateSubnet1Id:
-    Description: Private Subnet 1 ID
+  PrivateSubnet1:
+    Description: A reference to the private subnet in the 1st Availability Zone
     Value: !Ref PrivateSubnet1
     Export:
-      Name: PrivateSubnet1Id
+      Name: !Sub ${NetTeamInfra}-private-subnet1
 
-  PrivateSubnet2Id:
-    Description: Private Subnet 2 ID
+  PrivateSubnet2: 
+    Description: A reference to the private subnet in the 2nd Availability Zone
     Value: !Ref PrivateSubnet2
     Export:
-      Name: PrivateSubnet2Id
+      Name: !Sub ${NetTeamInfra}-private-subnet2
+
+  
