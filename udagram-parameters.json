@@ -1,0 +1,7 @@
+{
+  "VPCId": "vpc-xxxxxxxx",
+  "PublicSubnet1Id": "subnet-xxxxxxxx",
+  "PublicSubnet2Id": "subnet-xxxxxxxx",
+  "PrivateSubnet1Id": "subnet-xxxxxxxx",
+  "PrivateSubnet2Id": "subnet-xxxxxxxx"
+}

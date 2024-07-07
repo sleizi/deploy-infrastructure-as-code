@@ -1,0 +1,116 @@
+
+
+Parameters:
+  VPCId:
+    Type: String
+  PublicSubnet1Id:
+    Type: String
+  PublicSubnet2Id:
+    Type: String
+  PrivateSubnet1Id:
+    Type: String
+  PrivateSubnet2Id:
+    Type: String
+
+Resources:
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: udagram-alb
+      Subnets:
+        - !Ref PublicSubnet1Id
+        - !Ref PublicSubnet2Id
+      SecurityGroups: [ !Ref LoadBalancerSecurityGroup ]
+      Scheme: internet-facing
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  WebAppLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        InstanceType: t2.micro
+        ImageId: ami-005bdb005fb00e791
+        SecurityGroupIds: [ !Ref InstanceSecurityGroup ]
+        UserData:
+          Fn::Base64: |
+            #!/bin/bash
+            apt-get update -y
+            sudo apt-get install nginx -y
+            service nginx start
+            echo "It works! Udagram, Udacity" > /var/www/html/index.html
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP access and unrestricted outbound
+      VpcId: !Ref VPCId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+      LaunchTemplate:
+        LaunchTemplateId: !Ref WebAppLaunchTemplate
+        Version: 1
+      MinSize: 2
+      MaxSize: 4
+      DesiredCapacity: 2
+      TargetGroupARNs: [ !Ref TargetGroup ]
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: udagram-target-group
+      VpcId: !Ref VPCId
+      Port: 80
+      Protocol: HTTP
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: traffic-port
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200-399
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: udagram-static-content
+      AccessControl: PublicRead
+
+Outputs:
+  LoadBalancerDNSName:
+    Description: DNS name of the load balancer
+    Value: !Join [ "", [ "http://", !GetAtt ApplicationLoadBalancer.DNSName ] ]
